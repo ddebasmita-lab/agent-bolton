@@ -1,0 +1,40 @@
+# ── Python ──
+__pycache__/
+*.pyc
+*.pyo
+agent/venv/
+agent/.venv/
+.venv/
+agent/config.json
+agent/logs/
+
+# ── Terraform ──
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/terraform.tfvars
+
+# ── Local secrets ──
+.env
+.env.local
+*.key
+service-account*.json
+credentials*.json
+
+# ── OS / editor cruft ──
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# ── This deployment's configuration ──
+# config/instance.env is COMMITTED, deliberately: one clone of this repository
+# is one deployment, and that file is what makes this clone that deployment.
+#
+# Which means: KEEP YOUR CLONE PRIVATE. It names the GCP project, the region,
+# your DCP service URL and everyone allowed to reach the agent.
+#
+# API keys are never committed. They live only in Secret Manager, written once
+# by ./deploy.sh --bootstrap-secrets, which reads them from the environment and
+# writes nothing to disk.

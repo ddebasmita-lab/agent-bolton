@@ -1,0 +1,27 @@
+{
+  "$schema": "./schemas/agent-config.schema.json",
+  "$comment": "This deployment's agent config. deploy.sh uploads it to the config bucket, where the agent reads it once at startup — so a change needs ./deploy.sh --config-only --restart. Secrets never go here: the Gemini keys come from Secret Manager via GEMINI_API_KEYS_SECRET, and gemini.api_keys is a shape contract that must stay empty. query_param_key is omitted deliberately; with none set, the ?key= request overrides are disabled outright. See the Configuration section of README.md.",
+  "gemini": {
+    "filestores": [],
+    "demo_filestores": []
+  },
+  "mcp": {
+    "_comment": "Local-development default only, and never the value that ships: a deployed instance gets MCP_SERVER_URL from Terraform, pointing at your DCP instance, and the env var wins over this. The port here matches the `gcloud run services proxy ... --port=8082` that RUNNING.md uses, so a laptop run finds the tunnel without further configuration.",
+    "server_url": "http://127.0.0.1:8082",
+    "enabled": true
+  },
+  "knowledge_base": {
+    "_comment": "Disabled by default. To enable RAG: (1) provision a Gemini File Search corpus at aistudio.google.com, (2) upload your reference documents to it, (3) paste the corpus ID into gemini.filestores[] above, (4) set enabled to true.",
+    "enabled": false
+  },
+  "thinking": {
+    "mcp_level": "medium",
+    "synthesis_level": "medium"
+  },
+  "template_vars": {
+    "_comment": "Substituted into {{instance.*}} placeholders in prompts/. Set these to your own deployment's identity.",
+    "name": "Example Data Commons",
+    "region": "the world",
+    "states_term": "regions"
+  }
+}

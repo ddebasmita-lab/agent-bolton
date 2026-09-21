@@ -1,0 +1,46 @@
+# Pinned, and generated rather than hand-edited: resolve the five packages the
+# code actually imports -- Flask, flask-cors, requests, google-cloud-secret-manager
+# and gunicorn -- and freeze whatever they pull in.
+#
+# The agent calls Gemini over its REST API with requests (see src/gemini/client.py),
+# so no Gemini SDK belongs here. google-genai and google-generativeai were both
+# pinned and neither was ever imported; between them they dragged in httpx, pydantic,
+# websockets, tqdm and the google-api-python-client stack -- 21 packages installed
+# into the agent image on every build for nothing.
+#
+# google.cloud.secretmanager IS used, lazily, in src/config.py -- which is why
+# grpcio, protobuf and google-auth are still here and should stay.
+#
+# To regenerate:
+#   python3 -m venv .venv && .venv/bin/pip install \
+#       Flask flask-cors requests google-cloud-secret-manager gunicorn
+#   .venv/bin/pip freeze | sort > requirements.txt
+blinker==1.9.0
+cachetools==6.2.4
+certifi==2025.11.12
+charset-normalizer==3.4.4
+click==8.3.1
+flask-cors==6.0.2
+Flask==3.1.2
+google-api-core==2.28.1
+google-auth==2.45.0
+google-cloud-secret-manager==2.20.2
+googleapis-common-protos==1.72.0
+grpc-google-iam-v1==0.14.4
+grpcio-status==1.71.2
+grpcio==1.76.0
+gunicorn==23.0.0
+idna==3.11
+itsdangerous==2.2.0
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+packaging==26.3
+proto-plus==1.27.0
+protobuf==5.29.5
+pyasn1_modules==0.4.2
+pyasn1==0.6.1
+requests==2.32.5
+rsa==4.9.1
+typing_extensions==4.15.0
+urllib3==2.6.2
+Werkzeug==3.1.4
