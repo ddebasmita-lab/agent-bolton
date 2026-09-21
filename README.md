@@ -265,7 +265,3 @@ deploy.sh         the deployer
 run-local.sh      run it on this machine, pointed at your DCP instance
 ```
 
-## Licence
-
-Apache License 2.0. See [LICENSE](LICENSE); each source file carries its own
-copyright header.
