@@ -196,19 +196,22 @@ broken.
 `gcr.io/datcom-ci/datacommons-services:stable`, and that tag has not moved
 since June 2026. Its MCP server is a 1.2.x generation exposing two broad
 tools — `search_indicators` and `get_observations` — where later servers split
-the same work into six. `prompts/mcp.md` is written for those two, and
-`GET /agent/health` reports what the handshake actually found.
+the same work into six, adding `get_variable_metadata` among them. That one
+is what lets a figure be attributed to a named source with a licence; without
+it, provenance comes from the `source_metadata` block on the observation
+itself — correct, but a bare domain.
 
-Two consequences. Cross-place questions go through
-`get_observations(place_dcid=<parent>, child_place_type=...)` rather than a
-separate tool, so the parent place is `place_dcid` and not
-`parent_place_dcid`. And there is no `get_variable_metadata`, so a figure is
-attributed from the `source_metadata` block on the observation itself —
-correct, but a bare domain rather than a named source with a licence.
+`GET /agent/health` reports what the handshake actually found. If it ever
+shows more than two tools, your data plane is on a newer image than
+`prompts/mcp.md` assumes: the agent still works, but the extra tools go
+unused until the prompt names them.
 
-If `/agent/health` ever reports more than two tools, your data plane is on a
-newer image than this prompt assumes; the agent will still work, but four
-tools will go unused until `prompts/mcp.md` is widened.
+**`prompts/mcp.md` is this instance’s own prompt, not a template.** Unlike the
+other three, it carries your variable inventory — the metric DCIDs, which
+years each actually covers, and the traps in them (measures that exist at two
+geographies under different DCIDs, indices that are not percentages,
+biennial series). Edit it when your data changes; that knowledge is about
+your data, not about the agent.
 
 **Your own ingested series carry a single provenance.** They come back with an
 empty `alternative_sources` array, which reads like missing data and is not.
