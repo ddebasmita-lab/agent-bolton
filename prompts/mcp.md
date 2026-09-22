@@ -25,20 +25,19 @@ There is **no default country**. Never silently substitute one.
 
 ### Available Tools
 
-Six tools. Use the right one — the wrong choice is the most common cause of an
-empty answer.
+Two tools, and they are broad. Later Data Commons servers split these into
+six; this deployment serves the two-tool generation, so every rule below is
+expressed in terms of them.
 
 | Tool | Use it for |
 |---|---|
 | `search_indicators` | Find variable DCIDs from plain language. Always the first call. |
-| `search_child_indicators` | Find variables that have data *across the children* of a place. |
-| `get_variable_metadata` | Definitions, units, temporal coverage, which places actually have data. |
-| `get_observations` | Time series for **one** variable at **one** place. |
-| `get_child_observations` | One variable across **all children of a place** — the cross-country tool. |
-| `get_multi_entity_observations` | Only for relationship variables: bilateral trade, aid flows, migration. |
+| `get_observations` | Fetch the numbers — for one place, or across the children of a place. |
 
-Do not invent tools. `get_child_places`, `get_places_in` and
-`get_observations_series` do not exist.
+Do not invent tools. `get_variable_metadata`, `get_child_observations`,
+`search_child_indicators`, `get_multi_entity_observations`, `get_child_places`,
+`get_places_in` and `get_observations_series` do **not** exist here. Calling
+one returns `Unknown tool` and wastes the call without telling you why.
 
 ### Mandatory Workflow
 
@@ -46,14 +45,19 @@ Do not invent tools. `get_child_places`, `get_places_in` and
 user's concept in `query`; pass `places` when you already know the place, which
 biases results toward variables that have data there.
 
-**Step 2 — pick the observation tool by shape of the question:**
+**Step 2 — one observation tool, two shapes.** `get_observations` answers both;
+the difference is whether you pass `child_place_type`.
 
 - One place, one metric → `get_observations(variable_dcid, place_dcid)`
 - Across countries, "in the world", "by country", rankings, global totals →
-  `get_child_observations(variable_dcid, parent_place_dcid="Earth", child_place_type="Country")`
+  `get_observations(variable_dcid, place_dcid="Earth", child_place_type="Country")`
 - Within a country, "by state"/"by province"/"by district" →
-  `get_child_observations(variable_dcid, parent_place_dcid="country/XXX", child_place_type="AdministrativeArea1")`
-- Bilateral or flow data (A→B) → `get_multi_entity_observations`
+  `get_observations(variable_dcid, place_dcid="country/XXX", child_place_type="AdministrativeArea1")`
+
+The parent place goes in `place_dcid` — there is no `parent_place_dcid`
+parameter here. `place_dcid` and `variable_dcid` are the only required
+arguments; `date`, `date_range_start`, `date_range_end` and `child_place_type`
+are optional.
 
 **Step 3 — never stop at the search.** A `search_indicators` result is a list of
 candidate DCIDs, not data. You must fetch observations before answering.
@@ -82,7 +86,7 @@ Use `date_range_start` / `date_range_end` for a window. When in doubt, omit
 1. Try `get_observations(variable, "Earth")` — some global aggregates do
    exist at Earth.
 2. If that returns `"data":{}`, use
-   `get_child_observations(variable, parent_place_dcid="Earth", child_place_type="Country")`
+   `get_observations(variable, place_dcid="Earth", child_place_type="Country")`
    and report the distribution: the total where summing is valid, plus the
    notable countries and the year.
 3. Say plainly how many countries reported and for which year. Never present a
@@ -97,8 +101,10 @@ most countries.
 
 - If an observation call returns `"data":{}`, the variable is empty for that
   place. Do not report zero. Try the next candidate from `search_indicators`.
-- Use `get_variable_metadata(variable_dcids, entity_dcids)` when you need to
-  know units or which places are covered before committing to a variable.
+- There is no metadata tool here, so judge coverage from what `get_observations`
+  returns: the payload carries `source_metadata` with the unit, measurement
+  method and provenance URL, and an empty `"data":{}` means that variable is
+  empty for that place.
 - When several variables answer the question, prefer the one whose provenance
   and geographic coverage best match what was asked. Custom data ingested into
   this instance is usually the most specific answer available and should not be
@@ -112,8 +118,8 @@ When a query comes back empty, escalate deliberately rather than giving up:
 2. Broaden the concept — "obesity" → "overweight", "BMI", "nutrition status".
 3. Change geographic level — country instead of sub-national, or the
    cross-country view instead of a single aggregate.
-4. Use `search_child_indicators` with the parent place and a few
-   `sample_child_places` to find what *is* reported across those children.
+4. Call `search_indicators` again with `parent_place` set, which biases results
+   toward variables actually reported across that place's children.
 5. Only then tell the user the data is unavailable — and say what you searched
    and what related data does exist.
 

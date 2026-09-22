@@ -192,13 +192,23 @@ Two things are specific to a CDC backend. Neither needs configuring here —
 both are worth knowing before you read an answer and conclude something is
 broken.
 
-**Its MCP server may be an older generation.** 1.2.x servers expose two broad
-tools; 1.3.x and later split those into six and add `get_variable_metadata`,
-which is what lets a figure be attributed to a named source with a licence.
-The agent discovers which generation it is talking to during the handshake and
-offers the model only the tools that exist, so an older server gives correct
-answers with coarser citations rather than failing. `GET /agent/health`
-reports what it found.
+**Its MCP server serves two tools, not six.** Custom Data Commons runs
+`gcr.io/datcom-ci/datacommons-services:stable`, and that tag has not moved
+since June 2026. Its MCP server is a 1.2.x generation exposing two broad
+tools — `search_indicators` and `get_observations` — where later servers split
+the same work into six. `prompts/mcp.md` is written for those two, and
+`GET /agent/health` reports what the handshake actually found.
+
+Two consequences. Cross-place questions go through
+`get_observations(place_dcid=<parent>, child_place_type=...)` rather than a
+separate tool, so the parent place is `place_dcid` and not
+`parent_place_dcid`. And there is no `get_variable_metadata`, so a figure is
+attributed from the `source_metadata` block on the observation itself —
+correct, but a bare domain rather than a named source with a licence.
+
+If `/agent/health` ever reports more than two tools, your data plane is on a
+newer image than this prompt assumes; the agent will still work, but four
+tools will go unused until `prompts/mcp.md` is widened.
 
 **Your own ingested series carry a single provenance.** They come back with an
 empty `alternative_sources` array, which reads like missing data and is not.
@@ -299,3 +309,7 @@ deploy.sh         the deployer
 run-local.sh      run it on this machine, pointed at your CDC instance
 ```
 
+## Licence
+
+Apache License 2.0. See [LICENSE](LICENSE); each source file carries its own
+copyright header.
