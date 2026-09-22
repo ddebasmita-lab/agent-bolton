@@ -60,7 +60,7 @@ ENV_FILE="${ROOT}/config/instance.env"
 set -a; . "$ENV_FILE"; set +a
 
 MISSING=()
-for v in PROJECT_ID REGION INSTANCE DCP_SERVICE_URL DCP_SERVICE_NAME ACCESS_MODE ALLOWED_ORIGIN; do
+for v in PROJECT_ID REGION INSTANCE CDC_SERVICE_URL CDC_SERVICE_NAME ACCESS_MODE ALLOWED_ORIGIN; do
     [ -n "${!v:-}" ] || MISSING+=("$v")
 done
 if [ "${ACCESS_MODE:-}" = "iap" ] || [ "${ACCESS_MODE:-}" = "private" ]; then
@@ -112,7 +112,7 @@ fi
 # ---------------------------------------------------------------------------
 if [ "$DESTROY" = true ]; then
     log_warn "This destroys the agent service, its identity and its IAM bindings in ${PROJECT_ID}."
-    log_warn "Your DCP data plane, the config bucket and the secret are NOT touched."
+    log_warn "Your CDC data plane, the config bucket and the secret are NOT touched."
     read -r -p "Type the instance name to confirm: " confirm
     [ "$confirm" = "$INSTANCE" ] || { log_error "Did not match. Nothing destroyed."; exit 1; }
     terraform -chdir="$TF_DIR" init -reconfigure \
@@ -228,9 +228,9 @@ lines = [
     "",
     f"agent_image = {hcl(os.environ['V_AGENT_IMAGE'])}",
     "",
-    f"dcp_service_url   = {hcl(os.environ['DCP_SERVICE_URL'])}",
-    f"dcp_service_name  = {hcl(os.environ['DCP_SERVICE_NAME'])}",
-    f"enable_vpc_egress = {str(os.environ.get('ENABLE_VPC_EGRESS', 'false')).lower() == 'true' and 'true' or 'false'}",
+    f"cdc_service_url   = {hcl(os.environ['CDC_SERVICE_URL'])}",
+    f"cdc_service_name  = {hcl(os.environ['CDC_SERVICE_NAME'])}",
+    f"enable_vpc_egress = {str(os.environ.get('ENABLE_VPC_EGRESS', 'true')).lower() == 'true' and 'true' or 'false'}",
     "",
     f"config_bucket             = {hcl(bucket)}",
     f"config_base_url           = {hcl('https://storage.googleapis.com/' + bucket)}",

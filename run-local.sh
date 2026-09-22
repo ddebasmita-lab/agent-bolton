@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the agent on this machine, against your DCP instance.
+# Run the agent on this machine, against your CDC instance.
 #
 #   ./run-local.sh
 #
@@ -7,7 +7,7 @@
 # the agent on http://localhost:5001. See RUNNING.md for the whole story.
 #
 # Environment:
-#   MCP_SERVER_URL              DCP endpoint. Default: http://127.0.0.1:8082/mcp
+#   MCP_SERVER_URL              CDC endpoint. Default: http://127.0.0.1:8082/mcp
 #                               (what `gcloud run services proxy` gives you)
 #   GEMINI_API_KEYS_SECRET      Secret Manager id. Preferred — nothing on disk.
 #   GEMINI_API_KEY              A literal key. Written into agent/config.json,
@@ -81,7 +81,7 @@ fi
 ok "Config written."
 
 # ---------------------------------------------------------------------------
-# Reachability check. A private DCP is not reachable from a laptop directly:
+# Reachability check. A private CDC is not reachable from a laptop directly:
 # the agent can only attach a Google ID token when it runs on GCP, so off-GCP
 # the call arrives unauthenticated and is refused.
 # ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ case "$MCP_SERVER_URL" in
         if ! curl -fsS --max-time 3 -o /dev/null "${MCP_SERVER_URL%/mcp}" 2>/dev/null; then
             warn "Nothing is listening on ${MCP_SERVER_URL%/mcp}."
             warn "Start the proxy in another terminal:"
-            echo "    gcloud run services proxy <DCP_SERVICE_NAME> --region=<REGION> --port=8082"
+            echo "    gcloud run services proxy <CDC_SERVICE_NAME> --region=<REGION> --port=8082"
         fi
         ;;
     https://*)

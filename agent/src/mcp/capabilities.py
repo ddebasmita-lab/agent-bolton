@@ -19,9 +19,9 @@ container, a Data Commons Platform instance, or public datacommons.org -- and
 those do not all serve the same MCP tool surface. Server 1.2.1 exposes two fat
 tools; 1.3.0 splits them into six and adds get_variable_metadata.
 
-Nothing in this repo verifies which generation a given DCP deployment serves,
-and we cannot pin it: the image is Google's and moves independently of us. So
-the tool surface is treated as a property to be *discovered*, not declared.
+Nothing in this repo verifies which generation a given deployment serves, and
+we cannot pin it: the image is Google's and moves independently of us. So the
+tool surface is treated as a property to be *discovered*, not declared.
 
 Hardcoding a union of both generations -- the previous approach -- fails in a
 particularly unhelpful way. The model is offered a tool the server does not

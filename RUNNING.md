@@ -1,13 +1,13 @@
 # Running the agent
 
-How to start the agent and point it at a DCP instance — on your own machine
+How to start the agent and point it at a CDC instance — on your own machine
 first, then as a container, then on Cloud Run.
 
 If you only want it deployed, skip to [README.md](README.md); `./deploy.sh`
 does everything below for you.
 
 - [What the agent needs](#what-the-agent-needs)
-- [Connecting to a DCP MCP endpoint](#connecting-to-a-dcp-mcp-endpoint)
+- [Connecting to a CDC MCP endpoint](#connecting-to-a-dcp-mcp-endpoint)
 - [Running it locally](#running-it-locally)
 - [Running the container](#running-the-container)
 - [Building the image with Cloud Build](#building-the-image-with-cloud-build)
@@ -20,7 +20,7 @@ Four things, whatever it is running on:
 
 | | Where it comes from |
 |---|---|
-| **An MCP endpoint** | Your DCP instance. `MCP_SERVER_URL`. |
+| **An MCP endpoint** | Your CDC instance. `MCP_SERVER_URL`. |
 | **A Gemini API key** | Secret Manager via `GEMINI_API_KEYS_SECRET`, or `gemini.api_keys[]` in its config. |
 | **Its config** | `agent/config.json` on disk, or fetched from a bucket via `CONFIG_URL`. |
 | **Its prompts** | Merged into that config. Deployed, they come from `prompts/` in the bucket. |
@@ -31,42 +31,42 @@ phase runs with an empty system instruction: it answers, badly, and nothing in
 the logs says why. `run-local.sh` assembles the prompts for you, which is most
 of the reason it exists.
 
-## Connecting to a DCP MCP endpoint
+## Connecting to a CDC MCP endpoint
 
-Your DCP instance serves MCP at `/mcp` on its Cloud Run URL. The agent resolves
+Your CDC instance serves MCP at `/mcp` on its Cloud Run URL. The agent resolves
 that endpoint in this order:
 
 1. `MCP_SERVER_URL` — wins over everything.
 2. `mcp.server_url` in its config.
 3. `http://localhost:3000/mcp` — the fallback, for an MCP server on the same host.
 
-A bare origin is fine. `https://acme-dc-datacommons-service-xyz.run.app` gets
-`/mcp` appended for you, so both spellings work.
+A bare origin is fine. `https://acme-datacommons-xyz.run.app` gets `/mcp`
+appended for you, so both spellings work.
 
 On connect the agent performs the MCP handshake — a JSON-RPC `initialize` at
 protocol version `2024-11-05`, then an `initialized` notification — and holds
 the session id for later calls. If the server later says the session is gone,
-the agent re-handshakes and retries once, so a restarted DCP does not need the
+the agent re-handshakes and retries once, so a restarted CDC does not need the
 agent restarted too.
 
 ### Authentication, and why localhost matters
 
-A DCP service is normally IAM-gated. The agent authenticates by minting a
+A CDC service is normally IAM-gated. The agent authenticates by minting a
 Google-signed ID token for the target's origin and sending it as a bearer
 token. It gets that token from the **GCP metadata server** — which exists on
 Cloud Run and does not exist on your laptop.
 
 So pointing a local agent straight at `https://...run.app` sends an
-unauthenticated request, and DCP refuses it. That looks like the agent finding
+unauthenticated request, and CDC refuses it. That looks like the agent finding
 no data rather than like an auth failure.
 
 The way around it is a local proxy, which carries *your* gcloud credentials:
 
 ```bash
-gcloud run services proxy <DCP_SERVICE_NAME> --region=<REGION> --port=8082
+gcloud run services proxy <CDC_SERVICE_NAME> --region=<REGION> --port=8082
 ```
 
-Now `http://127.0.0.1:8082/mcp` reaches your DCP as you. The agent skips token
+Now `http://127.0.0.1:8082/mcp` reaches your CDC as you. The agent skips token
 minting for `http://` and localhost targets, so nothing fights the proxy.
 
 ## Running it locally
@@ -76,8 +76,8 @@ minting for `http://` and localhost targets, so nothing fights the proxy.
 python3 -m venv .venv
 .venv/bin/pip install -r agent/requirements.txt
 
-# 2. Open a tunnel to your DCP instance. Leave it running.
-gcloud run services proxy <DCP_SERVICE_NAME> --region=<REGION> --port=8082
+# 2. Open a tunnel to your CDC instance. Leave it running.
+gcloud run services proxy <CDC_SERVICE_NAME> --region=<REGION> --port=8082
 
 # 3. In another terminal, start the agent.
 PATH="$PWD/.venv/bin:$PATH" GEMINI_API_KEY=... ./run-local.sh
@@ -251,7 +251,7 @@ curl -s http://localhost:5001/agent/api/tools | python3 -m json.tool
 |---|---|
 | `mcp_url` is `http://localhost:3000/mcp` | `MCP_SERVER_URL` never reached the process. Check it is exported, not just set. |
 | Tool list is empty, no error | The handshake failed. Almost always auth — see the next row. |
-| Answers say there is no data, logs look clean | The call reached DCP and was refused. Off GCP: use the proxy. On Cloud Run: the agent's service account is missing `run.invoker` on the DCP service. |
+| Answers say there is no data, logs look clean | The call reached CDC and was refused. Off GCP: use the proxy. On Cloud Run: the agent's service account is missing `run.invoker` on the CDC service. |
 | `Connection refused` on 127.0.0.1:8082 | The `gcloud run services proxy` is not running, or is on another port. |
 | 404 from the MCP endpoint | The URL has a path that is not `/mcp`. A bare origin is safer — the agent appends it. |
 | Answers arrive but are vague and uncited | No prompts. You started `main.py` directly without `CONFIG_URL`. Use `run-local.sh`. |

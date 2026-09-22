@@ -6,7 +6,7 @@
     "demo_filestores": []
   },
   "mcp": {
-    "_comment": "Local-development default only, and never the value that ships: a deployed instance gets MCP_SERVER_URL from Terraform, pointing at your DCP instance, and the env var wins over this. The port here matches the `gcloud run services proxy ... --port=8082` that RUNNING.md uses, so a laptop run finds the tunnel without further configuration.",
+    "_comment": "Local-development default only, and never the value that ships: a deployed instance gets MCP_SERVER_URL from Terraform, pointing at your CDC instance, and the env var wins over this. The port here matches the `gcloud run services proxy ... --port=8082` that RUNNING.md uses, so a laptop run finds the tunnel without further configuration.",
     "server_url": "http://127.0.0.1:8082",
     "enabled": true
   },

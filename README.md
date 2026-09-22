@@ -1,8 +1,8 @@
 # Data Commons Agent
 
-A conversational agent over a Data Commons Platform (DCP) instance. It runs as a
+A conversational agent over a Custom Data Commons (CDC) instance. It runs as a
 single Cloud Run service, answers questions in natural language by calling your
-DCP data plane through MCP, and streams the answer back as Server-Sent Events.
+CDC data plane through MCP, and streams the answer back as Server-Sent Events.
 
 There is no user interface here. This is an API you call from your own front
 end.
@@ -10,11 +10,12 @@ end.
 ## Contents
 
 - [How it fits together](#how-it-fits-together)
-- [Running it](RUNNING.md) — locally, in a container, and how the DCP connection is wired
+- [Running it](RUNNING.md) — locally, in a container, and how the CDC connection is wired
 - [Prerequisites](#prerequisites)
 - [Quickstart](#quickstart)
 - [The API](#the-api)
 - [Reaching your data plane](#reaching-your-data-plane)
+- [What a CDC backend changes](#what-a-cdc-backend-changes)
 - [Configuration](#configuration)
 - [Access modes](#access-modes)
 - [Everyday commands](#everyday-commands)
@@ -37,14 +38,14 @@ end.
    └──────────────┬───────────────┘
                   │  ID token, minted per request
                   ▼
-      your DCP instance (Cloud Run)
-      provisioned separately by datacommons-cli
+      your CDC instance (Cloud Run)
+      Mixer + NL server + website, usually ingress=internal
 ```
 
 Two things follow from this shape, and both matter when you build the front end:
 
-**Your browser code cannot call DCP directly.** The agent's service account is
-the only principal granted `run.invoker` on your DCP service. Requests for chart
+**Your browser code cannot call CDC directly.** The agent's service account is
+the only principal granted `run.invoker` on your CDC service. Requests for chart
 data go to the agent, which replays them upstream with a Google-signed ID token.
 That is what `/dcproxy` is for.
 
@@ -54,8 +55,10 @@ the endpoint accordingly — see [Access modes](#access-modes).
 ## Prerequisites
 
 - A GCP project with billing enabled.
-- A **DCP instance already provisioned** by `datacommons-cli`, and its
-  `terraform output datacommons_service_url` and `datacommons_service_name`.
+- A **CDC instance already deployed and serving**, plus the URL and the Cloud
+  Run service NAME of it. If you did not deploy it yourself, find it with
+  `gcloud run services list --region=<REGION>` — it is the service that
+  answers on `/mcp`.
 - A **Gemini API key** from [aistudio.google.com](https://aistudio.google.com).
 - Local tools: `gcloud` (authenticated, with ADC), `terraform` >= 1.5,
   `python3`, `curl`.
@@ -63,7 +66,7 @@ the endpoint accordingly — see [Access modes](#access-modes).
   IAM bindings, buckets, Artifact Registry repositories and secrets. Project
   Editor plus Project IAM Admin covers it.
 
-You also need permission to grant `run.invoker` on the **DCP** service. That
+You also need permission to grant `run.invoker` on the **CDC** service. That
 grant is what makes the backend reachable, and it is frequently the one thing a
 deployer does not have.
 
@@ -86,7 +89,7 @@ The deploy prints the agent's URL and its service account. Check it:
 curl https://<agent-url>/agent/health
 ```
 
-To run it on your own machine first — against the same DCP instance, without
+To run it on your own machine first — against the same CDC instance, without
 deploying anything — see **[RUNNING.md](RUNNING.md)**.
 
 ## The API
@@ -155,22 +158,53 @@ credential of your own required.
 
 ## Reaching your data plane
 
-`DCP_SERVICE_NAME` in `config/instance.env` is what the agent's service account
+`CDC_SERVICE_NAME` in `config/instance.env` is what the agent's service account
 is granted `run.invoker` on. If it is wrong or missing, the backend refuses
 every call — and the agent reports "I don't have this data" rather than
 surfacing an error. If answers are consistently empty, check that binding
 first:
 
 ```bash
-gcloud run services get-iam-policy <DCP_SERVICE_NAME> --region=<REGION>
+gcloud run services get-iam-policy <CDC_SERVICE_NAME> --region=<REGION>
 ```
 
 You should see the agent's service account with `roles/run.invoker`.
 
-If your DCP service is `ingress=internal`, also set `ENABLE_VPC_EGRESS="true"`.
-That routes all of the agent's outbound traffic through a VPC, which is what
-reaching an internal service requires. Private Google Access covers Gemini, GCS
-and Secret Manager; anything else outbound then needs Cloud NAT.
+A CDC data plane is normally deployed `ingress=internal` — it was designed to
+sit behind something that proxies to it, and here that something is this
+agent. So `ENABLE_VPC_EGRESS="true"` is the usual setting rather than the
+exception, and it ships as the default. Check which you have:
+
+```bash
+gcloud run services describe <CDC_SERVICE_NAME> --region=<REGION> \
+    --format=yaml | grep -i ingress
+```
+
+Turning it on routes **all** of the agent's outbound traffic through a VPC,
+which is what reaching an internal service requires. Private Google Access
+covers Gemini, GCS and Secret Manager; any genuinely public host the agent
+needs then requires Cloud NAT. If your CDC service accepts public traffic,
+set it to `"false"` and skip the VPC entirely.
+
+## What a CDC backend changes
+
+Two things are specific to a CDC backend. Neither needs configuring here —
+both are worth knowing before you read an answer and conclude something is
+broken.
+
+**Its MCP server may be an older generation.** 1.2.x servers expose two broad
+tools; 1.3.x and later split those into six and add `get_variable_metadata`,
+which is what lets a figure be attributed to a named source with a licence.
+The agent discovers which generation it is talking to during the handshake and
+offers the model only the tools that exist, so an older server gives correct
+answers with coarser citations rather than failing. `GET /agent/health`
+reports what it found.
+
+**Your own ingested series carry a single provenance.** They come back with an
+empty `alternative_sources` array, which reads like missing data and is not.
+Rule 5 of `prompts/synthesis.md` says so explicitly — if you rewrite that
+prompt, keep the rule, or the agent will fetch your data and then report that
+it does not have it.
 
 ## Configuration
 
@@ -232,15 +266,15 @@ an arbitrary website from driving your agent and spending your Gemini quota.
 ./deploy.sh --plan                   # show the Terraform diff, change nothing
 ./deploy.sh --code-only              # rebuild and redeploy the image only
 ./deploy.sh --config-only --restart  # push prompts/config and restart
-./deploy.sh --destroy                # tear down the agent (not your DCP)
+./deploy.sh --destroy                # tear down the agent (not your CDC)
 ```
 
 ## Troubleshooting
 
 | Symptom | Cause |
 |---|---|
-| Every answer says the data is unavailable | The `run.invoker` grant on your DCP service is missing or names the wrong service. Check `DCP_SERVICE_NAME`. |
-| Chat works, charts 404 | Your front end is calling DCP directly instead of the agent's proxied paths. |
+| Every answer says the data is unavailable | The `run.invoker` grant on your CDC service is missing or names the wrong service. Check `CDC_SERVICE_NAME`. |
+| Chat works, charts 404 | Your front end is calling CDC directly instead of the agent's proxied paths. |
 | CORS errors in the browser | `ALLOWED_ORIGIN` does not list your front end's origin. It is comma-separated and exact — scheme and port included. |
 | 403 after signing in successfully | `iap` mode without the IAP service agent binding, or no OAuth consent screen in the project. |
 | Deploy fails on the `allUsers` binding | Your organisation enforces Domain Restricted Sharing. Use `iap`. |
@@ -262,6 +296,6 @@ config/
 terraform/        one Cloud Run service, one service account, access control
 cloudbuild.yaml   build and roll out from CI — see RUNNING.md
 deploy.sh         the deployer
-run-local.sh      run it on this machine, pointed at your DCP instance
+run-local.sh      run it on this machine, pointed at your CDC instance
 ```
 

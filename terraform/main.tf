@@ -1,32 +1,33 @@
 # ---------------------------------------------------------------------------
 # Data Commons Agent — Cloud Run service, runtime identity, access control.
 #
-# One service. It runs the chat orchestration against your DCP data plane and
+# One service. It runs the chat orchestration against your CDC data plane and
 # reverse-proxies the browser's data routes to it, so your own front end can
 # reach Data Commons without holding any credential of its own.
 #
 # Everything this module needs already exists before `terraform apply`:
-#   - the DCP data plane           provisioned by datacommons-cli
+#   - the CDC data plane           deployed separately
 #   - the config bucket            created by deploy.sh
 #   - the Gemini API key secret    created by deploy.sh --bootstrap-secrets
 # ---------------------------------------------------------------------------
 
 locals {
   # The one value the agent actually needs. Both the MCP tool loop and the
-  # /dcproxy reverse proxy talk to this host; on DCP a single container serves
-  # both the MCP endpoint and the website routes the chart components call.
-  data_plane_url = var.dcp_service_url
-  mcp_url        = "${var.dcp_service_url}/mcp"
+  # /dcproxy reverse proxy talk to this host; on CDC a single container serves
+  # Mixer, the NL server, the MCP endpoint and the website routes the chart
+  # components call.
+  data_plane_url = var.cdc_service_url
+  mcp_url        = "${var.cdc_service_url}/mcp"
 
   service_name = "${var.instance}-agent"
 
-  # Direct VPC egress exists for exactly one reason: to reach a DCP service
+  # Direct VPC egress exists for exactly one reason: to reach a CDC service
   # whose ingress is internal. It is NOT free to switch on — Cloud Run requires
   # egress=ALL_TRAFFIC to reach a *.run.app host through a VPC, which routes
   # EVERY outbound call through that subnet. Private Google Access covers
   # *.googleapis.com, so Gemini, GCS and Secret Manager still work.
   #
-  # Turn it on only if your DCP service is ingress=internal.
+  # Turn it on only if your CDC service is ingress=internal.
   needs_vpc_egress = var.enable_vpc_egress
 }
 
@@ -50,7 +51,7 @@ data "google_project" "current" {
 # ---------------------------------------------------------------------------
 # Runtime identity
 #
-# This is the identity that must hold run.invoker on the DCP service. Without
+# This is the identity that must hold run.invoker on the CDC service. Without
 # that binding the backend refuses every call, and it surfaces as "no data"
 # rather than as an error.
 # ---------------------------------------------------------------------------
@@ -86,7 +87,7 @@ resource "google_project_iam_member" "agent_metric_writer" {
 }
 
 # ---------------------------------------------------------------------------
-# Private network for agent egress. Created only when the DCP service is
+# Private network for agent egress. Created only when the CDC service is
 # ingress=internal — see local.needs_vpc_egress above.
 # ---------------------------------------------------------------------------
 
@@ -183,7 +184,7 @@ resource "google_cloud_run_v2_service" "agent" {
         value = local.mcp_url
       }
       # Where /dcproxy replays the browser's data routes. Both point at the
-      # same DCP host — one container there serves MCP and the website routes.
+      # same CDC host — one container there serves MCP and the website routes.
       env {
         name  = "DATA_PLANE_URL"
         value = local.data_plane_url
@@ -239,12 +240,12 @@ resource "google_cloud_run_v2_service" "agent" {
 # Access
 # ---------------------------------------------------------------------------
 
-# The binding that makes the DCP backend reachable. The DCP service is created
-# outside this module by datacommons-cli, so it is referenced by name.
-resource "google_cloud_run_v2_service_iam_member" "agent_invokes_dcp" {
+# The binding that makes the CDC backend reachable. The CDC service is
+# deployed outside this module, so it is referenced by name.
+resource "google_cloud_run_v2_service_iam_member" "agent_invokes_cdc" {
   project  = var.project_id
   location = var.region
-  name     = var.dcp_service_name
+  name     = var.cdc_service_name
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.agent.email}"
 }
@@ -318,6 +319,6 @@ output "agent_url" {
 }
 
 output "agent_service_account" {
-  description = "Runtime identity. This is what holds run.invoker on your DCP service."
+  description = "Runtime identity. This is what holds run.invoker on your CDC service."
   value       = google_service_account.agent.email
 }

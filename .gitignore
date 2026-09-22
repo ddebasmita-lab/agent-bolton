@@ -33,7 +33,7 @@ credentials*.json
 # is one deployment, and that file is what makes this clone that deployment.
 #
 # Which means: KEEP YOUR CLONE PRIVATE. It names the GCP project, the region,
-# your DCP service URL and everyone allowed to reach the agent.
+# your CDC service URL and everyone allowed to reach the agent.
 #
 # API keys are never committed. They live only in Secret Manager, written once
 # by ./deploy.sh --bootstrap-secrets, which reads them from the environment and

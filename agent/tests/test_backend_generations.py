@@ -8,11 +8,10 @@ The agent must run unchanged against either MCP server generation: 1.2.x (two
 fat tools, `place_observations` / `time_series` payloads) and 1.3.x (six tools,
 columnar `data.rows` payloads).
 
-1.2.x was what the removed CDC services container served. It is still pinned
-here because this is payload-shape handling, not cdc plumbing -- capability
-discovery reads whatever `tools/list` returns, and nothing guarantees every DCP
-instance serves 1.3.x. Dropping the 1.2.x path is a separate decision that
-needs a survey of deployed DCP versions first.
+Both are pinned because a CDC services container can be either one: the image
+is Google's and moves independently of this agent, so capability discovery
+reads whatever `tools/list` actually returns rather than assuming a version.
+Dropping the 1.2.x path needs a survey of deployed versions first.
 
 The case that matters most is the *empty* response. The previous regex-based
 check looked for a `"time_series": [[` substring; a 1.3.x server signals "no

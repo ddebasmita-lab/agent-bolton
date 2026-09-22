@@ -8,7 +8,7 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "Region for Cloud Run. Use the same one as your DCP service unless you have a reason not to."
+  description = "Region for Cloud Run. Use the same one as your CDC service unless you have a reason not to."
   type        = string
 }
 
@@ -27,46 +27,44 @@ variable "agent_image" {
 }
 
 # ---------------------------------------------------------------------------
-# Your DCP data plane
+# Your CDC data plane
 # ---------------------------------------------------------------------------
 
-variable "dcp_service_url" {
+variable "cdc_service_url" {
   description = <<-EOT
-    Base URL of your DCP services instance.
-
-    From `terraform output datacommons_service_url` in the scaffold that
-    datacommons-cli generated.
+    Base URL of your CDC services instance — the Cloud Run service running
+    Mixer, the NL server and the website.
   EOT
   type        = string
 
   validation {
-    condition     = can(regex("^https://", var.dcp_service_url))
-    error_message = "dcp_service_url must be an https:// URL."
+    condition     = can(regex("^https://", var.cdc_service_url))
+    error_message = "cdc_service_url must be an https:// URL."
   }
 }
 
-variable "dcp_service_name" {
+variable "cdc_service_name" {
   description = <<-EOT
-    Cloud Run service NAME of your DCP backend — not the URL.
+    Cloud Run service NAME of your CDC backend — not the URL. Conventionally
+    "<instance>-datacommons".
 
-    From `terraform output datacommons_service_name` (conventionally
-    "<namespace>-dc-datacommons-service"). The agent's service account is
-    granted run.invoker on it, and that single binding is what makes a private
-    DCP backend reachable. Get it wrong and every answer comes back "no data"
-    with nothing logged to explain it.
+    The agent's service account is granted run.invoker on it, and that single
+    binding is what makes a private CDC backend reachable. Get it wrong and
+    every answer comes back "no data" with nothing logged to explain it.
   EOT
   type        = string
 
   validation {
-    condition     = length(trimspace(var.dcp_service_name)) > 0
-    error_message = "dcp_service_name is required."
+    condition     = length(trimspace(var.cdc_service_name)) > 0
+    error_message = "cdc_service_name is required."
   }
 }
 
 variable "enable_vpc_egress" {
   description = <<-EOT
-    Route the agent's outbound traffic through a VPC. Turn this on only if your
-    DCP service is ingress=internal.
+    Route the agent's outbound traffic through a VPC. Required when the CDC
+    service is ingress=internal, which is how one is normally deployed —
+    hence the default.
 
     Not a free switch: reaching a *.run.app host through a VPC requires
     egress=ALL_TRAFFIC, which routes every outbound call through the subnet.
@@ -75,7 +73,7 @@ variable "enable_vpc_egress" {
     Cloud NAT.
   EOT
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "agent_subnet_cidr" {
