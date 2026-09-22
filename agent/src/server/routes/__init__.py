@@ -21,10 +21,10 @@ from src.server.routes.health import health_bp
 from src.server.routes.system import system_bp
 from src.server.routes.tools import tools_bp
 
-# The API blueprints declare their routes at the root (/chat/stream, /health)
-# and the /agent prefix is applied here. Override it with AGENT_API_PREFIX if
-# it collides with a path your own front end already uses; the data-plane
-# routes dcproxy owns sit at the root and are unaffected.
+# Blueprints declare their routes at the root (/chat/stream, /health) and get
+# the prefix applied here. Override it with AGENT_API_PREFIX if it collides
+# with a path your own front end already uses; the data-plane routes dcproxy
+# owns sit at the root and are unaffected.
 _API_PREFIX = os.environ.get("AGENT_API_PREFIX", "/agent")
 
 
