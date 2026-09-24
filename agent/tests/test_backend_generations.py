@@ -28,9 +28,19 @@ import types
 
 sys.path.insert(0, os.getcwd())
 
+class _FakeSession:
+    """Enough of requests.Session for client.py to construct one at import."""
+
+    def mount(self, *args, **kwargs):
+        pass
+
+
 for name, attrs in {
     "src.config": {"load_config": lambda: {}, "AGENT_ROOT": "."},
     "src.session_logger": {"SessionLogger": object},
+    "src.gcp_auth": {"attach_auth": lambda *a, **k: None},
+    "requests": {"Session": _FakeSession, "RequestException": Exception},
+    "requests.adapters": {"HTTPAdapter": lambda *a, **k: None},
 }.items():
     module = types.ModuleType(name)
     for key, value in attrs.items():
@@ -49,6 +59,8 @@ def _load(name, path):
 du = _load("data_utils", "src/mcp/data_utils.py")
 caps_mod = _load("capabilities", "src/mcp/capabilities.py")
 schema = _load("schema", "src/mcp/schema.py")
+sys.modules["src.mcp.schema"] = schema
+client = _load("client", "src/mcp/client.py")
 
 
 def tool_call(name, payload):
@@ -111,6 +123,60 @@ check("places coerced to a list on search_child_indicators",
 check("variable_dcids coerced to a list on get_variable_metadata",
       schema.fix_tool_arguments("get_variable_metadata", {"variable_dcids": "Count_Person"})["variable_dcids"] == ["Count_Person"])
 
-total = 14
+print("\nunknown tool — the server reports it as a successful call:")
+
+
+def _envelope(text):
+    return {"content": [{"type": "text", "text": text}]}
+
+
+UNKNOWN_TOOL = _envelope("Unknown tool: 'get_variable_metadata'")
+
+check("envelope form detected",
+      client._looks_like_unknown_tool(UNKNOWN_TOOL))
+check("bare string form detected",
+      client._looks_like_unknown_tool("Unknown tool: 'get_places_in'"))
+check("1.2.x data is not mistaken for one",
+      not client._looks_like_unknown_tool(_envelope(json.dumps(V121_WITH_DATA))))
+check("1.3.x data is not mistaken for one",
+      not client._looks_like_unknown_tool(_envelope(json.dumps(V130_WITH_DATA))))
+check("an empty result is not mistaken for one",
+      not client._looks_like_unknown_tool(_envelope(json.dumps(V130_EMPTY))))
+
+
+class _Recorder:
+    """Captures the status each tool result is logged under."""
+
+    def __init__(self):
+        self.statuses = []
+
+    def log_mcp_tool_call(self, *args, **kwargs):
+        pass
+
+    def log_mcp_tool_result(self, name, result, duration_ms, status="success"):
+        self.statuses.append(status)
+
+
+def _statuses_for(payload, tool="get_observations"):
+    client.mcp_call = lambda method, params: {"result": payload}
+    recorder = _Recorder()
+    client.call_tool(tool, {}, recorder)
+    return recorder.statuses
+
+
+# The regression this pins: an unknown tool used to be logged "success", so a
+# prompt naming a tool the server lacks cost a capped iteration and left no
+# trace. Status is the only signal a reader of the session log gets.
+check("unknown tool logs status error, not success",
+      _statuses_for(UNKNOWN_TOOL, "get_variable_metadata") == ["error"])
+check("a real result still logs success",
+      _statuses_for(_envelope(json.dumps(V130_WITH_DATA))) == ["success"])
+# Detection is observability only: the text tells the model what went wrong and
+# it generally recovers, so nothing retries or rewrites the payload.
+client.mcp_call = lambda method, params: {"result": UNKNOWN_TOOL}
+check("the payload still reaches the model unchanged",
+      client.call_tool("get_variable_metadata", {}) == UNKNOWN_TOOL)
+
+total = 22
 print(f"\n{total - len(fails)}/{total} checks passed" if not fails else f"\nFAILURES: {fails}")
 sys.exit(1 if fails else 0)

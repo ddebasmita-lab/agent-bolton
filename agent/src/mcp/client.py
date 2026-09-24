@@ -75,6 +75,20 @@ _SESSION_LOST_MARKERS = (
     "missing session",
 )
 
+# Calling a tool the server does not serve is reported *in band*: the JSON-RPC
+# reply is a success whose payload is the error text, with no error member to
+# key off. Logged naively that reads as status "success", so a prompt naming a
+# tool this server generation lacks burns an iteration of a capped loop and
+# leaves no trace anywhere -- which is how one shipped prompt kept a phantom
+# tool call for as long as it did. Matched case-insensitively, like the session
+# markers above, because this wording is not standardised either.
+_UNKNOWN_TOOL_MARKERS = (
+    "unknown tool",
+    "tool not found",
+    "no such tool",
+)
+_RESULT_SCAN_CHARS = 512
+
 
 def get_session_id() -> Optional[str]:
     """This thread's MCP session id, if it has one."""
@@ -92,6 +106,30 @@ def _looks_like_lost_session(result: dict) -> bool:
         return False
     text = json.dumps(error, default=str).lower()
     return any(marker in text for marker in _SESSION_LOST_MARKERS)
+
+
+def _result_text_head(payload: Any) -> str:
+    """The head of a tools/call result's text, lowercased, for matching.
+
+    Bounded because this runs on every successful call and an observations
+    payload can be large, while the messages we match against are short enough
+    to be the entire payload.
+    """
+    if isinstance(payload, str):
+        return payload[:_RESULT_SCAN_CHARS].lower()
+    if isinstance(payload, dict):
+        content = payload.get("content")
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and isinstance(block.get("text"), str):
+                    return block["text"][:_RESULT_SCAN_CHARS].lower()
+    return ""
+
+
+def _looks_like_unknown_tool(payload: Any) -> bool:
+    """True when the server is telling us the tool we called does not exist."""
+    text = _result_text_head(payload)
+    return any(marker in text for marker in _UNKNOWN_TOOL_MARKERS)
 
 
 def _normalise_url(url: str) -> str:
@@ -392,10 +430,26 @@ def call_tool(name: str, arguments: dict, session_logger: Optional[SessionLogger
     duration_ms = (time.time() - start_time) * 1000
 
     if "result" in result:
+        payload = result["result"]
+        # This is the only place an unknown tool can be caught, since the server
+        # reports it as a successful call. Nothing retries or rewrites it -- the
+        # text tells the model what went wrong and it generally recovers -- but
+        # it is recorded as the failure it is rather than as a success, and
+        # warned about, because the cause is always a prompt naming a tool this
+        # server does not serve and that is a fix nobody makes unseen.
+        if _looks_like_unknown_tool(payload):
+            logger.warning(
+                "MCP server has no tool %r: a prompt is naming a tool this "
+                "server generation does not serve, and the call was wasted",
+                name,
+            )
+            if session_logger:
+                session_logger.log_mcp_tool_result(name, payload, duration_ms, "error")
+            return payload
         # Log successful result
         if session_logger:
-            session_logger.log_mcp_tool_result(name, result["result"], duration_ms, "success")
-        return result["result"]
+            session_logger.log_mcp_tool_result(name, payload, duration_ms, "success")
+        return payload
 
     # Log error result
     error_result = {"error": result.get("error", "Unknown error")}

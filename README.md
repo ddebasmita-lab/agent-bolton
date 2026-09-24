@@ -206,12 +206,16 @@ shows more than two tools, your data plane is on a newer image than
 `prompts/mcp.md` assumes: the agent still works, but the extra tools go
 unused until the prompt names them.
 
-**`prompts/mcp.md` is this instance’s own prompt, not a template.** Unlike the
-other three, it carries your variable inventory — the metric DCIDs, which
+**`prompts/mcp.md` ships generic, with one section for you to fill in.** It
+teaches the two-tool workflow and says nothing about your data, because the
+generator has no way to know what you ingested. Its “Instance data
+inventory” section is deliberately empty — record your metric DCIDs, which
 years each actually covers, and the traps in them (measures that exist at two
-geographies under different DCIDs, indices that are not percentages,
-biennial series). Edit it when your data changes; that knowledge is about
-your data, not about the agent.
+geographies under different DCIDs, indices that are not percentages, biennial
+series). The agent works without it, but spends extra search calls
+rediscovering what you already know. The note telling you this is an HTML
+comment in the file; the agent strips those before anything reaches the
+model, so it costs you nothing to leave it in place.
 
 **Your own ingested series carry a single provenance.** They come back with an
 empty `alternative_sources` array, which reads like missing data and is not.
@@ -311,8 +315,3 @@ cloudbuild.yaml   build and roll out from CI — see RUNNING.md
 deploy.sh         the deployer
 run-local.sh      run it on this machine, pointed at your CDC instance
 ```
-
-## Licence
-
-Apache License 2.0. See [LICENSE](LICENSE); each source file carries its own
-copyright header.
